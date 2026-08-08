@@ -1,0 +1,42 @@
+// This is the "brain" of Yousuf's AI.
+// It receives a message from the website, sends it to Google Gemini (the AI),
+// and sends Gemini's reply back to the website.
+// Gemini has a free tier, so this costs nothing for personal/light use.
+
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+dotenv.config(); // loads your secret API key from the .env file
+
+const app = express();
+app.use(cors());          // allows your frontend website to talk to this backend
+app.use(express.json());  // allows this server to understand JSON messages
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+
+// This is the "door" the frontend knocks on to send a chat message.
+app.post("/chat", async (req, res) => {
+  try {
+    const userMessage = req.body.message;
+
+    if (!userMessage) {
+      return res.status(400).json({ error: "No message provided" });
+    }
+
+    const result = await model.generateContent(userMessage);
+    const reply = result.response.text();
+
+    res.json({ reply });
+  } catch (error) {
+    console.error("Error talking to Gemini:", error);
+    res.status(500).json({ error: "Something went wrong talking to the AI." });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Yousuf's AI backend is running at http://localhost:${PORT}`);
+});
