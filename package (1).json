@@ -1,6 +1,6 @@
 {
   "name": "yousufs-ai-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Backend for Yousuf's AI, powered by Groq (free tier), deployed on Vercel",
   "dependencies": {
