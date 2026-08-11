@@ -1,9 +1,0 @@
-{
-  "name": "yousufs-ai-backend",
-  "version": "1.0.0",
-  "type": "module",
-  "description": "Backend for Yousuf's AI, powered by Google Gemini (free tier), deployed on Vercel",
-  "dependencies": {
-    "@google/generative-ai": "^0.21.0"
-  }
-}
