@@ -30,34 +30,51 @@ export default async function handler(req, res) {
   }
 
   try {
-    const userMessage = req.body.message || "";
-    const imageDataUrl = req.body.image; // optional base64 data URL
+    const history = req.body.history || [];
+    const latestMessage = req.body.message || "";
+    const imageDataUrl = req.body.image;
 
-    if (!userMessage && !imageDataUrl) {
-      return res.status(400).json({ error: "No message or image provided" });
+    if (!latestMessage && !imageDataUrl && history.length === 0) {
+      return res.status(400).json({ error: "No messages provided" });
     }
 
-    let userContent;
+    // Format historical messages for Groq API
+    const formattedMessages = history.map((msg) => {
+      const role = msg.sender === "user" ? "user" : "assistant";
+      if (msg.image && msg.sender === "user") {
+        return {
+          role,
+          content: [
+            { type: "text", text: msg.text || "Attached photo" },
+            { type: "image_url", image_url: { url: msg.image } }
+          ]
+        };
+      }
+      return { role, content: msg.text || "" };
+    });
+
+    // Add current user message
+    let currentContent;
     if (imageDataUrl) {
-      userContent = [
-        { type: "text", text: userMessage || "What is in this photo?" },
-        { type: "image_url", image_url: { url: imageDataUrl } },
+      currentContent = [
+        { type: "text", text: latestMessage || "What is in this photo?" },
+        { type: "image_url", image_url: { url: imageDataUrl } }
       ];
     } else {
-      userContent = userMessage;
+      currentContent = latestMessage;
     }
+
+    formattedMessages.push({ role: "user", content: currentContent });
 
     const completion = await groq.chat.completions.create({
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userContent },
+        ...formattedMessages
       ],
       model: "qwen/qwen3.6-27b",
     });
 
     let reply = completion.choices[0].message.content;
-
-    // Remove internal reasoning (<think> tags) if returned by model
     reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
     res.status(200).json({ reply });
