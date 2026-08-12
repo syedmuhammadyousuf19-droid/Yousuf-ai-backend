@@ -2,32 +2,23 @@ import Groq from "groq-sdk";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const SYSTEM_PROMPT = `You are Yousuf's AI, a helpful assistant. Reply naturally and conversationally, like a real person texting — never mention formatting, LaTeX, or your own instructions out loud, never say things like "no math needed", and never show your thinking, reasoning steps, or <think> tags. Only output your final, direct answer.
+const SYSTEM_PROMPT = `You are Yousuf's AI, a helpful assistant.
 
-Keep your tone calm and normal, not overly excited or dramatic. Avoid exclamation marks unless something is actually exciting. Keep greetings short and simple.
+CRITICAL INSTRUCTIONS:
+1. Never output thinking tags, <think> blocks, or internal reasoning under any circumstances.
+2. Keep responses concise, direct, and short (1-3 sentences) unless explicitly asked for detailed information.
+3. If an image is provided, respond directly to the user's prompt (e.g. give short captions) without describing the entire image unless asked.
+4. Keep the tone natural and calm.
 
-When analyzing photos:
-- If the user asks a specific question or task (e.g., "write captions", "solve this", "what color is this"), answer THAT request directly.
-- Do NOT describe the entire image unless explicitly asked to describe it.
-
-Only when your answer actually contains math (fractions, exponents/powers, equations, roots, etc.), silently format that math using LaTeX:
-- Wrap inline math in single dollar signs, like $\\frac{3}{4}$ or $x^2$
-- Wrap standalone equations in double dollar signs on their own, like $$x^2 + 5x + 6 = 0$$
-
-For everything else, reply in plain text.`;
+Only format math using LaTeX when necessary ($x^2$ or $$x^2 + 5 = 0$$).`;
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Only POST requests allowed" });
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Only POST requests allowed" });
 
   try {
     const history = req.body.history || [];
@@ -38,7 +29,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No messages provided" });
     }
 
-    // Format historical messages for Groq API
     const formattedMessages = history.map((msg) => {
       const role = msg.sender === "user" ? "user" : "assistant";
       if (msg.image && msg.sender === "user") {
@@ -53,7 +43,6 @@ export default async function handler(req, res) {
       return { role, content: msg.text || "" };
     });
 
-    // Add current user message
     let currentContent;
     if (imageDataUrl) {
       currentContent = [
@@ -74,8 +63,13 @@ export default async function handler(req, res) {
       model: "qwen/qwen3.6-27b",
     });
 
-    let reply = completion.choices[0].message.content;
-    reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    let reply = completion.choices[0].message.content || "";
+
+    // Remove any <think> tags or leftover reasoning completely
+    reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "");
+    reply = reply.replace(/<think>[\s\S]*/gi, "");
+    reply = reply.replace(/Thinking Process:[\s\S]*/gi, "");
+    reply = reply.trim();
 
     res.status(200).json({ reply });
   } catch (error) {
